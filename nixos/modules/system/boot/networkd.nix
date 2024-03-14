@@ -17,11 +17,14 @@ let
           "ManageForeignRoutingPolicyRules"
           "ManageForeignRoutes"
           "RouteTable"
+          "IPv6PrivacyExtensions"
         ])
         (assertValueOneOf "SpeedMeter" boolValues)
-        (assertInt "SpeedMeterIntervalSec")
+        (assertUnsignedInt "SpeedMeterIntervalSec")
         (assertValueOneOf "ManageForeignRoutingPolicyRules" boolValues)
         (assertValueOneOf "ManageForeignRoutes" boolValues)
+        (assertRouteTableDef "RouteTable")
+        (assertValueOneOf "IPv6PrivacyExtensions" (boolValues ++ ["prefer-public" "kernel"]))
       ];
 
       sectionDHCPv4 = checkUnitConfig "DHCPv4" [
@@ -31,6 +34,8 @@ let
           "DUIDRawData"
         ])
         (assertValueOneOf "ClientIdentifier" ["mac" "duid" "duid-only"])
+        (assertDuidType "DUIDType")
+        (assertDuid "DUIDRawData")
       ];
 
       sectionDHCPv6 = checkUnitConfig "DHCPv6" [
@@ -38,6 +43,8 @@ let
           "DUIDType"
           "DUIDRawData"
         ])
+        (assertDuidType "DUIDType")
+        (assertDuid "DUIDRawData")
       ];
     };
 

@@ -71,30 +71,31 @@ in rec {
 
   assertNetdevMacAddress = name: group: attr:
     optional (attr ? ${name} && (! isMacAddress attr.${name} && attr.${name} != "none"))
-      "Systemd ${group} field `${name}` must be a valid MAC address or the special value `none`.";
+      "Systemd ${group} field `${name}` must be a valid MAC address or the special value `none'.";
 
+  isDuid = s: match "^([0-9a-fA-F]{2}:){1,127}[0-9a-fA-F]{2}$" s != null;
 
-  isPort = i: i >= 0 && i <= 65535;
-
-  assertPort = name: group: attr:
-    optional (attr ? ${name} && ! isPort attr.${name})
-      "Error on the systemd ${group} field `${name}': ${attr.name} is not a valid port number.";
+  assertDuid = name: group: attr:
+    optional (attr ? ${name} && !isDuid attr.${name})
+      "Systemd ${group} field `${name}' must be a valid DUID.";
 
   assertValueOneOf = name: values: group: attr:
     optional (attr ? ${name} && !elem attr.${name} values)
-      "Systemd ${group} field `${name}' cannot have value `${toString attr.${name}}'.";
+      "Systemd ${group} field `${name}' must be one of the values [${concatStringsSep " " (map (values: "`${value}'") values)}].";
 
   assertValuesSomeOfOr = name: values: default: group: attr:
     optional (attr ? ${name} && !(all (x: elem x values) (splitString " " attr.${name}) || attr.${name} == default))
-      "Systemd ${group} field `${name}' cannot have value `${toString attr.${name}}'.";
+      "Systemd ${group} field `${name}' must be some of the values [${concatStringsSep " " (map (values: "`${value}'") values)}] or `${default}'.";
 
   assertHasField = name: group: attr:
     optional (!(attr ? ${name}))
       "Systemd ${group} field `${name}' must exist.";
 
+  isInRange = min: max: i: min <= attr.${name} && max >= attr.${name};
+
   assertRange = name: min: max: group: attr:
-    optional (attr ? ${name} && !(min <= attr.${name} && max >= attr.${name}))
-      "Systemd ${group} field `${name}' is outside the range [${toString min},${toString max}]";
+    optional (attr ? ${name} && !isInRange min max)
+      "Systemd ${group} field `${name}' must be in the range [${toString min} ${toString max}]";
 
   assertMinimum = name: min: group: attr:
     optional (attr ? ${name} && attr.${name} < min)
@@ -107,7 +108,41 @@ in rec {
 
   assertInt = name: group: attr:
     optional (attr ? ${name} && !isInt attr.${name})
-      "Systemd ${group} field `${name}' is not an integer";
+      "Systemd ${group} field `${name}' must be an integer";
+
+  assertUnsignedInt = name: group: attr:
+    optional (attr ? ${name} && attr.${name} > 0)
+      "Systemd ${group} field `${name}' must be an unsigned integer.";
+
+  isValidRouteTableDef = s:
+    let
+      parts = splitString ":" s;
+    in
+    length parts == 2 &&
+    (let
+      name = head parts;
+      numberStr = elemAt parts 1;
+    in
+      !elem name ["default" "main" "local"] && all (c: elem c digits) (stringToCharacters numberStr) &&
+    (let
+      number = strings.toInt numberStr;
+    in
+      number >= 1 && number <= 4294967295 && !elem number [253 254 255]
+    ));
+
+  assertRouteTableDef = name: group: attr:
+    optional (attr ? ${name} && !all isValidRouteTableDef attr.${name})
+      "Error on the systemd ${group} field `${name}' must contain only valid route table names.";
+
+  isPort = i: isInRange 0 65535 i;
+
+  assertPort = name: group: attr:
+    optional (attr ? ${name} && !isPort attr.${name})
+      "Error on the systemd ${group} field `${name}': ${attr.name} must be a valid port number in the range [0-65535].";
+
+  assertDuidType = name: group: attr:
+    optional (attr ? ${name} && !isInRange 0 65535 attr.${name} && !elem attr.${name} ["vendor" "uuid" "link-layer-time" "link-layer"] && !match "link-layer-time:*+" attr.${name})
+      "Systemd ${group} field `${name}' must be in the range [${toString min}-${toString max}] or one of the special values [`vendor',`uuid',`link-layer-time',`link-layer]'].";
 
   checkUnitConfig = group: checks: attrs: let
     # We're applied at the top-level type (attrsOf unitOption), so the actual
